@@ -1,0 +1,48 @@
+# Files to exclude from npm package
+
+# Development files
+src/
+tsconfig.json
+.github/
+.vscode/
+.idea/
+
+# Test files
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+__tests__/
+test/
+tests/
+
+# Documentation (except README)
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY_IMPROVEMENTS.md
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.travis.yml
+.circleci/
+azure-pipelines.yml
+
+# Editor config
+.editorconfig
+.eslintrc*
+.prettierrc*
+
+# Misc
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.*
+
+# Only include build output
+!build/

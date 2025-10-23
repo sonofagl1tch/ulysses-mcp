@@ -1,0 +1,44 @@
+{
+  "name": "ulysses-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for interacting with Ulysses writing app on macOS",
+  "type": "module",
+  "bin": {
+    "ulysses-mcp": "./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "inspector": "npx @modelcontextprotocol/inspector build/index.js",
+    "start": "node build/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "UPDATE_WITH_YOUR_REPOSITORY_URL"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ulysses",
+    "writing",
+    "automation",
+    "ai",
+    "llm"
+  ],
+  "author": "UPDATE_WITH_YOUR_NAME",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
