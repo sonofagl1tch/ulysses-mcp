@@ -19,8 +19,29 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { execFile } from "child_process";
 import { promisify } from "util";
+import * as http from "http";
 
 const execFileAsync = promisify(execFile);
+
+// Callback server state
+interface CallbackState {
+  resolve: (data: any) => void;
+  reject: (error: Error) => void;
+  timeout: NodeJS.Timeout;
+}
+
+const callbackServers = new Map<number, http.Server>();
+const pendingCallbacks = new Map<string, CallbackState>();
+const CALLBACK_TIMEOUT_MS = 30000; // 30 seconds
+
+// Actions that require callbacks to receive data
+const CALLBACK_ACTIONS = new Set([
+  "authorize",
+  "read-sheet",
+  "get-item",
+  "get-root-items",
+  "get-version"
+]);
 
 // Whitelist of allowed Ulysses API actions
 const ALLOWED_ACTIONS = new Set([
@@ -155,8 +176,107 @@ function checkRateLimit(action: string): void {
 }
 
 /**
+ * Find an available port for the callback server
+ */
+async function findAvailablePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (address && typeof address === 'object') {
+        const port = address.port;
+        server.close(() => resolve(port));
+      } else {
+        server.close(() => reject(new Error('Failed to get port')));
+      }
+    });
+    server.on('error', reject);
+  });
+}
+
+/**
+ * Create a callback server for receiving Ulysses responses
+ */
+async function createCallbackServer(callbackId: string): Promise<{ port: number; promise: Promise<any> }> {
+  const port = await findAvailablePort();
+  
+  const callbackPromise = new Promise<any>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pendingCallbacks.delete(callbackId);
+      const server = callbackServers.get(port);
+      if (server) {
+        server.close();
+        callbackServers.delete(port);
+      }
+      reject(new McpError(
+        ErrorCode.InternalError,
+        `Callback timeout for action: ${callbackId.split('-')[0]}. Ulysses may not be running or may not have called back to the server.\n\nTroubleshooting:\n1. Ensure Ulysses is installed and running\n2. Check that Ulysses has permission to access x-callback-url\n3. Try the command manually`
+      ));
+    }, CALLBACK_TIMEOUT_MS);
+    
+    pendingCallbacks.set(callbackId, { resolve, reject, timeout });
+    
+    const server = http.createServer((req, res) => {
+      const url = new URL(req.url || '', `http://127.0.0.1:${port}`);
+      const receivedCallbackId = url.searchParams.get('callbackId');
+      
+      if (receivedCallbackId !== callbackId) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+      }
+      
+      const callback = pendingCallbacks.get(callbackId);
+      if (!callback) {
+        res.writeHead(404);
+        res.end('Callback not found');
+        return;
+      }
+      
+      // Parse callback data from URL params
+      const params: Record<string, string> = {};
+      url.searchParams.forEach((value, key) => {
+        if (key !== 'callbackId') {
+          params[key] = value;
+        }
+      });
+      
+      res.writeHead(200);
+      res.end('OK');
+      
+      // Clean up
+      clearTimeout(callback.timeout);
+      pendingCallbacks.delete(callbackId);
+      server.close();
+      callbackServers.delete(port);
+      
+      if (url.pathname.includes('/x-error')) {
+        callback.reject(new Error(params.errorMessage || 'Ulysses returned an error'));
+      } else {
+        callback.resolve(params);
+      }
+    });
+    
+    server.listen(port, '127.0.0.1', () => {
+      callbackServers.set(port, server);
+      console.error(`Callback server listening on port ${port} for ${callbackId}`);
+    });
+    
+    server.on('error', (error) => {
+      clearTimeout(timeout);
+      pendingCallbacks.delete(callbackId);
+      callbackServers.delete(port);
+      reject(error);
+    });
+  });
+  
+  return { port, promise: callbackPromise };
+}
+
+/**
  * Executes a Ulysses x-callback-url command
  * Uses execFile to prevent command injection vulnerabilities
+ * For callback actions, waits for Ulysses to respond with data
  */
 async function executeUlyssesCommand(
   action: string,
@@ -173,21 +293,52 @@ async function executeUlyssesCommand(
   // Check rate limit for destructive operations
   checkRateLimit(action);
   
-  const paramString = Object.entries(params)
-    .map(([key, value]) => `${key}=${encodeParam(value)}`)
-    .join("&");
+  const needsCallback = CALLBACK_ACTIONS.has(action);
+  let url: string;
+  let callbackPromise: Promise<any> | null = null;
   
-  const url = `ulysses://x-callback-url/${action}${paramString ? `?${paramString}` : ""}`;
+  if (needsCallback) {
+    // Create callback server and wait for response
+    const callbackId = `${action}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const { port, promise } = await createCallbackServer(callbackId);
+    callbackPromise = promise;
+    
+    const successUrl = encodeParam(`http://127.0.0.1:${port}/x-success?callbackId=${callbackId}`);
+    const errorUrl = encodeParam(`http://127.0.0.1:${port}/x-error?callbackId=${callbackId}`);
+    
+    const paramString = Object.entries(params)
+      .map(([key, value]) => `${key}=${encodeParam(value)}`)
+      .join("&");
+    
+    url = `ulysses://x-callback-url/${action}?x-success=${successUrl}&x-error=${errorUrl}${paramString ? `&${paramString}` : ""}`;
+  } else {
+    // No callback needed for this action
+    const paramString = Object.entries(params)
+      .map(([key, value]) => `${key}=${encodeParam(value)}`)
+      .join("&");
+    
+    url = `ulysses://x-callback-url/${action}${paramString ? `?${paramString}` : ""}`;
+  }
   
   try {
     // Use execFile instead of exec to prevent shell injection
     await execFileAsync('open', [url]);
-    return `Successfully executed ${action}`;
+    
+    if (callbackPromise) {
+      // Wait for callback and format the response
+      const result = await callbackPromise;
+      return JSON.stringify(result, null, 2);
+    } else {
+      return `Successfully executed ${action}`;
+    }
   } catch (error) {
+    if (error instanceof McpError) {
+      throw error;
+    }
     // Sanitize error messages to avoid exposing sensitive information
     throw new McpError(
       ErrorCode.InternalError,
-      `Failed to execute Ulysses command: ${action}`
+      `MCP error -32603: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }

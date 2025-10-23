@@ -265,6 +265,63 @@ If you discover a security vulnerability, please email [your-email] or open a se
 - **Research Integration**: Fetch and incorporate research
 - **Outline Expansion**: Turn briefs into full articles
 
+## Limitations & Future Enhancements
+
+### Current Limitations
+
+The MCP server is limited by the capabilities of the Ulysses x-callback-url API. Some features available in the Ulysses GUI are not currently available via the API:
+
+**Not Currently Supported:**
+
+- ❌ **Search functionality** - Cannot search across sheets by content or metadata
+- ❌ **Statistics** - Cannot retrieve word counts, character counts, or reading time
+- ❌ **Export operations** - Cannot export sheets to PDF, DOCX, or other formats
+- ❌ **Publishing** - Cannot publish directly to WordPress, Medium, or other platforms
+- ❌ **Goals and targets** - Cannot set or retrieve writing goals
+- ❌ **Sheet history** - Cannot access revision history or version control
+- ❌ **Filters** - Cannot filter sheets by date, keywords, or other criteria
+- ❌ **Favorites management** - Cannot mark/unmark sheets as favorites via API
+- ❌ **Theme/appearance** - Cannot control Ulysses appearance or editor settings
+
+### Feature Request Submitted
+
+A feature request has been submitted to Ulysses to expand the x-callback-url API with additional capabilities. If you'd like to see more features, consider:
+
+1. **Voting** on the feature request (link TBD when available)
+2. **Contacting Ulysses support** to express interest in API expansion
+3. **Sharing use cases** that would benefit from enhanced API access
+
+### Workarounds
+
+For some limitations, partial workarounds exist:
+
+- **Statistics**: Read sheet content and calculate locally
+- **Search**: Use `get-root-items` with `recursive=YES` and filter locally
+- **Export**: Read content and export using external tools
+
+### Potential Future Enhancements
+
+If the Ulysses API is expanded, this MCP server could potentially support:
+
+- 🔮 Full-text search across the library
+- 🔮 Export sheets to various formats
+- 🔮 Retrieve writing statistics and analytics
+- 🔮 Manage writing goals and targets
+- 🔮 Access revision history
+- 🔮 Advanced filtering and sorting
+- 🔮 Publishing integrations
+
+**Note:** These enhancements depend on Ulysses expanding their x-callback-url API. The MCP server is designed to be easily updated when new API capabilities become available.
+
+## 📚 Documentation
+
+For detailed information about architecture, security, privacy, and authentication, see the comprehensive documentation in the [docs/](./docs/) directory:
+
+- **[Architecture](./docs/ARCHITECTURE.md)** - System architecture, data flows, and technical details
+- **[Authentication](./docs/AUTHENTICATION.md)** - Authorization model, access tokens, and security
+- **[Privacy & Security](./docs/PRIVACY.md)** - Privacy guarantees, security features, and verification
+- **[Documentation Index](./docs/README.md)** - Complete documentation overview
+
 ## Development
 
 ### Building
