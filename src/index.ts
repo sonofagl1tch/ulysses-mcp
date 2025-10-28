@@ -17,22 +17,31 @@ import {
   ErrorCode,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import { execFile } from "child_process";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
-import * as http from "http";
+import * as fs from "fs";
+import * as path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const execFileAsync = promisify(execFile);
 
-// Callback server state
+// Callback state for file-based IPC
 interface CallbackState {
   resolve: (data: any) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
+  pollInterval: NodeJS.Timeout;
 }
 
-const callbackServers = new Map<number, http.Server>();
 const pendingCallbacks = new Map<string, CallbackState>();
 const CALLBACK_TIMEOUT_MS = 30000; // 30 seconds
+const POLL_INTERVAL_MS = 100; // Check for callback file every 100ms
+const HELPER_APP_PATH = path.join(__dirname, "..", "helper-app", "UlyssesMCPHelper.app");
+const HELPER_PID_FILE = "/tmp/ulysses-mcp-helper.pid";
 
 // Actions that require callbacks to receive data
 const CALLBACK_ACTIONS = new Set([
@@ -176,101 +185,136 @@ function checkRateLimit(action: string): void {
 }
 
 /**
- * Find an available port for the callback server
+ * Ensure the helper app is running
  */
-async function findAvailablePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = http.createServer();
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      if (address && typeof address === 'object') {
-        const port = address.port;
-        server.close(() => resolve(port));
-      } else {
-        server.close(() => reject(new Error('Failed to get port')));
+async function ensureHelperAppRunning(): Promise<void> {
+  try {
+    // Check if helper app is already running
+    if (fs.existsSync(HELPER_PID_FILE)) {
+      const pid = parseInt(fs.readFileSync(HELPER_PID_FILE, 'utf8').trim());
+      try {
+        // Check if process is still running
+        process.kill(pid, 0);
+        console.error(`Helper app already running with PID ${pid}`);
+        return;
+      } catch (e) {
+        // Process not running, clean up stale PID file
+        fs.unlinkSync(HELPER_PID_FILE);
       }
-    });
-    server.on('error', reject);
-  });
+    }
+    
+    // Start the helper app
+    console.error('Starting Ulysses MCP Helper app...');
+    
+    // Check if compiled app exists
+    if (fs.existsSync(HELPER_APP_PATH)) {
+      spawn('open', ['-a', HELPER_APP_PATH], {
+        detached: true,
+        stdio: 'ignore'
+      }).unref();
+    } else {
+      // Fall back to running the Swift file directly (for development)
+      const swiftPath = path.join(__dirname, "..", "helper-app", "UlyssesMCPHelper.swift");
+      if (fs.existsSync(swiftPath)) {
+        console.error('Compiled app not found, running Swift file directly...');
+        spawn('swift', [swiftPath], {
+          detached: true,
+          stdio: 'ignore'
+        }).unref();
+      } else {
+        throw new Error(`Helper app not found at ${HELPER_APP_PATH} or ${swiftPath}`);
+      }
+    }
+    
+    // Wait for helper app to start and create PID file
+    let attempts = 0;
+    while (attempts < 50) { // 5 seconds max
+      if (fs.existsSync(HELPER_PID_FILE)) {
+        const pid = parseInt(fs.readFileSync(HELPER_PID_FILE, 'utf8').trim());
+        console.error(`Helper app started with PID ${pid}`);
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+    
+    throw new Error('Helper app failed to start within timeout period');
+  } catch (error) {
+    throw new McpError(
+      ErrorCode.InternalError,
+      `Failed to start helper app: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 /**
- * Create a callback server for receiving Ulysses responses
+ * Poll for callback file and wait for response
  */
-async function createCallbackServer(callbackId: string): Promise<{ port: number; promise: Promise<any> }> {
-  const port = await findAvailablePort();
-  
-  const callbackPromise = new Promise<any>((resolve, reject) => {
+async function waitForCallback(callbackId: string): Promise<any> {
+  return new Promise<any>((resolve, reject) => {
+    const callbackFilePath = `/tmp/ulysses-mcp-callback-${callbackId}.json`;
+    
     const timeout = setTimeout(() => {
-      pendingCallbacks.delete(callbackId);
-      const server = callbackServers.get(port);
-      if (server) {
-        server.close();
-        callbackServers.delete(port);
+      const callback = pendingCallbacks.get(callbackId);
+      if (callback) {
+        clearInterval(callback.pollInterval);
+        pendingCallbacks.delete(callbackId);
+      }
+      // Clean up callback file if it exists
+      try {
+        if (fs.existsSync(callbackFilePath)) {
+          fs.unlinkSync(callbackFilePath);
+        }
+      } catch (e) {
+        // Ignore cleanup errors
       }
       reject(new McpError(
         ErrorCode.InternalError,
-        `Callback timeout for action: ${callbackId.split('-')[0]}. Ulysses may not be running or may not have called back to the server.\n\nTroubleshooting:\n1. Ensure Ulysses is installed and running\n2. Check that Ulysses has permission to access x-callback-url\n3. Try the command manually`
+        `Callback timeout for action: ${callbackId.split('-')[0]}. The helper app may not be running or Ulysses may not have responded.\n\nTroubleshooting:\n1. Ensure Ulysses is installed and running\n2. Ensure the helper app is running (check /tmp/ulysses-mcp-helper.pid)\n3. Check that Ulysses has permission to access x-callback-url\n4. Try running: npm run build-helper to rebuild the helper app`
       ));
     }, CALLBACK_TIMEOUT_MS);
     
-    pendingCallbacks.set(callbackId, { resolve, reject, timeout });
-    
-    const server = http.createServer((req, res) => {
-      const url = new URL(req.url || '', `http://127.0.0.1:${port}`);
-      const receivedCallbackId = url.searchParams.get('callbackId');
-      
-      if (receivedCallbackId !== callbackId) {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-      }
-      
-      const callback = pendingCallbacks.get(callbackId);
-      if (!callback) {
-        res.writeHead(404);
-        res.end('Callback not found');
-        return;
-      }
-      
-      // Parse callback data from URL params
-      const params: Record<string, string> = {};
-      url.searchParams.forEach((value, key) => {
-        if (key !== 'callbackId') {
-          params[key] = value;
+    // Poll for callback file
+    const pollInterval = setInterval(() => {
+      try {
+        if (fs.existsSync(callbackFilePath)) {
+          // Read and parse callback data
+          const data = fs.readFileSync(callbackFilePath, 'utf8');
+          const response = JSON.parse(data);
+          
+          // Clean up
+          clearTimeout(timeout);
+          clearInterval(pollInterval);
+          pendingCallbacks.delete(callbackId);
+          
+          // Delete callback file
+          try {
+            fs.unlinkSync(callbackFilePath);
+          } catch (e) {
+            console.error(`Warning: Could not delete callback file: ${e}`);
+          }
+          
+          // Check if this was an error callback
+          if (response.isError) {
+            const errorMessage = response.data.errorMessage || 'Ulysses returned an error';
+            reject(new Error(errorMessage));
+          } else {
+            resolve(response.data);
+          }
         }
-      });
-      
-      res.writeHead(200);
-      res.end('OK');
-      
-      // Clean up
-      clearTimeout(callback.timeout);
-      pendingCallbacks.delete(callbackId);
-      server.close();
-      callbackServers.delete(port);
-      
-      if (url.pathname.includes('/x-error')) {
-        callback.reject(new Error(params.errorMessage || 'Ulysses returned an error'));
-      } else {
-        callback.resolve(params);
+      } catch (error) {
+        clearTimeout(timeout);
+        clearInterval(pollInterval);
+        pendingCallbacks.delete(callbackId);
+        reject(new McpError(
+          ErrorCode.InternalError,
+          `Failed to read callback data: ${error instanceof Error ? error.message : String(error)}`
+        ));
       }
-    });
+    }, POLL_INTERVAL_MS);
     
-    server.listen(port, '127.0.0.1', () => {
-      callbackServers.set(port, server);
-      console.error(`Callback server listening on port ${port} for ${callbackId}`);
-    });
-    
-    server.on('error', (error) => {
-      clearTimeout(timeout);
-      pendingCallbacks.delete(callbackId);
-      callbackServers.delete(port);
-      reject(error);
-    });
+    pendingCallbacks.set(callbackId, { resolve, reject, timeout, pollInterval });
   });
-  
-  return { port, promise: callbackPromise };
 }
 
 /**
@@ -298,13 +342,15 @@ async function executeUlyssesCommand(
   let callbackPromise: Promise<any> | null = null;
   
   if (needsCallback) {
-    // Create callback server and wait for response
-    const callbackId = `${action}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const { port, promise } = await createCallbackServer(callbackId);
-    callbackPromise = promise;
+    // Ensure helper app is running
+    await ensureHelperAppRunning();
     
-    const successUrl = encodeParam(`http://127.0.0.1:${port}/x-success?callbackId=${callbackId}`);
-    const errorUrl = encodeParam(`http://127.0.0.1:${port}/x-error?callbackId=${callbackId}`);
+    // Create callback and wait for response via file-based IPC
+    const callbackId = `${action}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    callbackPromise = waitForCallback(callbackId);
+    
+    const successUrl = encodeParam(`ulysses-mcp-callback://x-success?callbackId=${callbackId}`);
+    const errorUrl = encodeParam(`ulysses-mcp-callback://x-error?callbackId=${callbackId}`);
     
     const paramString = Object.entries(params)
       .map(([key, value]) => `${key}=${encodeParam(value)}`)
