@@ -35,13 +35,30 @@ npm install ulysses-mcp
 ### From Source
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/sonofagl1tch/ulysses-mcp.git
 cd ulysses-mcp
 npm install
 npm run build
 ```
 
-> **Note**: Update package.json with your repository URL before publishing.
+### Building the Helper App
+
+> ⚠️ **IMPORTANT**: The helper app binary is not included in this repository for security reasons. You must build it locally after installation.
+
+After installation, you need to build the helper app (required for callback operations):
+
+```bash
+npm run build-helper
+```
+
+This creates a small macOS application that handles callbacks from Ulysses. The helper app:
+
+- Runs automatically when needed (you don't need to start it manually)
+- Registers a custom URL scheme (`ulysses-mcp-callback://`)
+- Enables operations that require callbacks (authorization, reading content, etc.)
+- **Should never be committed to version control** (already in .gitignore)
+
+For more details, see [Helper App Documentation](./docs/HELPER_APP.md).
 
 ## Configuration
 
@@ -209,6 +226,13 @@ Access tokens persist until revoked in Ulysses preferences.
 
 ## Security
 
+> ⚠️ **PRIVACY WARNING**: While this MCP server is completely local and private, your AI assistant may send data to cloud services depending on your configuration:
+>
+> - **Cloud AI (Claude Desktop, ChatGPT, etc.)**: Your writing may be sent to their servers
+> - **Local AI (Ollama, LM Studio)**: Stays completely local ✅
+>
+> For sensitive content, use local-only AI models. See [Privacy Documentation](./docs/PRIVACY.md) for details.
+
 ### Access Token Handling
 
 ⚠️ **IMPORTANT SECURITY WARNINGS**:
@@ -240,7 +264,7 @@ This server implements comprehensive input validation:
 
 ### Reporting Security Issues
 
-If you discover a security vulnerability, please email [your-email] or open a security advisory on GitHub. Do not open public issues for security vulnerabilities.
+If you discover a security vulnerability, please email <sonofagl1tch@pebcakconsulting.com> or open a security advisory on GitHub. Do not open public issues for security vulnerabilities.
 
 ## Use Cases
 
@@ -412,7 +436,7 @@ This is an unofficial tool and is not affiliated with or endorsed by Ulysses Gmb
 
 ## Support
 
-- **Issues**: [GitHub Issues](<your-repository-url>/issues)
+- **Issues**: [GitHub Issues](https://github.com/sonofagl1tch/ulysses-mcp/issues)
 - **Ulysses Support**: [ulysses.app/support](https://ulysses.app/support)
 - **MCP Documentation**: [modelcontextprotocol.io](https://modelcontextprotocol.io)
 

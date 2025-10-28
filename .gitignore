@@ -32,6 +32,8 @@ lerna-debug.log*
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
 
 # Testing
 coverage/
@@ -40,3 +42,89 @@ coverage/
 # Misc
 *.orig
 .cache/
+
+# ============================================
+# MCP Server Specific - Security Critical
+# ============================================
+
+# Compiled Helper Application
+# The .app bundle is a compiled binary that should be built locally
+helper-app/**/*.app/
+helper-app/**/*.dSYM/
+helper-app/**/build/
+
+# MCP Configuration Files (may contain access tokens)
+# These files are user-specific and may contain sensitive tokens
+**/mcp_settings.json
+**/cline_mcp_settings.json
+**/*_mcp_settings.json
+mcp-config.json
+.mcp/
+.cline/
+
+# Access Tokens and Secrets
+# Never commit files that might contain Ulysses access tokens
+*token*
+*secret*
+*secrets*
+*access-token*
+*.pem
+*.key
+*.crt
+*.p12
+*.keystore
+
+# Local Configuration
+# User-specific configs that might contain sensitive paths or settings
+config.local.json
+settings.local.json
+local-config.json
+.local/
+
+# Temporary and Debug Files
+# May contain sensitive data during development/debugging
+tmp/
+temp/
+*.tmp
+debug.log
+*.debug
+trace.log
+*.trace
+
+# Backup Files
+# Might contain old versions with sensitive data
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+
+# macOS Specific
+# Additional macOS system files
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.fseventsd
+.DocumentRevisions-V100
+.TemporaryItems
+.apdisk
+
+# Code Signing
+# Signing certificates and provisioning profiles
+*.mobileprovision
+*.provisionprofile
+*.certSigningRequest
+*.cer
+*.p12
+*.keychain
+
+# User-specific helper app builds
+# Keep source but not compiled artifacts
+helper-app/**/*.o
+helper-app/**/*.d
+helper-app/**/*.dia
+helper-app/**/DerivedData/
+helper-app/**/*.xcarchive

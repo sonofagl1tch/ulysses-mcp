@@ -10,8 +10,8 @@ We take the security of the Ulysses MCP Server seriously. If you discover a secu
 
 Instead, please report security vulnerabilities by:
 
-1. **Email**: Send details to [your-email@example.com] (Update with your actual email)
-2. **GitHub Security Advisory**: Use the [GitHub Security Advisory](UPDATE_WITH_YOUR_REPO_URL/security/advisories/new) feature
+1. **Email**: Send details to <sonofagl1tch@pebcakconsulting.com>
+2. **GitHub Security Advisory**: Use the [GitHub Security Advisory](https://github.com/sonofagl1tch/ulysses-mcp/security/advisories/new) feature
 
 ### What to Include
 

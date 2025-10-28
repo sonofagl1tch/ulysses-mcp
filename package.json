@@ -11,6 +11,7 @@
   ],
   "scripts": {
     "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "build-helper": "bash scripts/build-helper.sh",
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
@@ -18,7 +19,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "UPDATE_WITH_YOUR_REPOSITORY_URL"
+    "url": "https://github.com/sonofagl1tch/ulysses-mcp"
   },
   "keywords": [
     "mcp",
@@ -29,7 +30,7 @@
     "ai",
     "llm"
   ],
-  "author": "UPDATE_WITH_YOUR_NAME",
+  "author": "Ryan Nolette",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0"
