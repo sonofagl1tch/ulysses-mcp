@@ -1,0 +1,256 @@
+# CodeRabbit Configuration for Ulysses MCP Server
+# Documentation: https://docs.coderabbit.ai/guides/configure-coderabbit
+
+# Global Settings
+language: en-US
+tone_instructions: "Be concise, technical, and focus on code quality, security, and MCP best practices"
+early_access: false
+
+# Code Reviews Configuration
+reviews:
+  # Use assertive profile for thorough code reviews
+  profile: assertive
+
+  # Generate high-level summary
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+
+  # Review status and commit status
+  review_status: true
+  commit_status: true
+  fail_commit_status: false
+
+  # Walkthrough settings
+  collapse_walkthrough: false
+  changed_files_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+
+  # PR enhancement features
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  auto_apply_labels: false
+  suggested_reviewers: true
+  auto_assign_reviewers: false
+  poem: true
+
+  # Auto-review settings
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT REVIEW"
+    labels: []
+    base_branches: []
+    ignore_usernames: []
+
+  # Path filters - exclude build artifacts and dependencies
+  path_filters:
+    - "!node_modules/**"
+    - "!build/**"
+    - "!coverage/**"
+    - "!dist/**"
+    - "!*.min.js"
+    - "!package-lock.json"
+
+  # Path-specific instructions
+  path_instructions:
+    - path: "src/**/*.ts"
+      instructions: |
+        SECURITY PRIORITY - Focus on:
+        - Input validation and sanitization (especially URL parameters and user inputs)
+        - Check for command injection vulnerabilities in child_process usage
+        - Verify URL construction is safe (no injection, proper encoding)
+        - Ensure sensitive data (access tokens, API keys) are never logged
+        - Check for path traversal vulnerabilities in file operations
+        - Verify proper error handling that doesn't expose sensitive information
+        - Check for race conditions in async operations
+        - Ensure all user-provided data is validated before use
+        - Verify secure defaults and principle of least privilege
+        - Check for proper authentication and authorization checks
+        - TypeScript strict mode compliance and proper typing
+
+    - path: "**/*.test.ts"
+      instructions: |
+        - Verify security test cases are included (injection, validation, authorization)
+        - Check for proper test isolation and cleanup
+        - Ensure tests don't contain hardcoded secrets or credentials
+        - Verify mock implementations don't bypass security checks
+        - Test both success and error/security failure cases
+
+    - path: "docs/**/*.md"
+      instructions: |
+        - Check for clarity and completeness
+        - Verify code examples are correct and up-to-date
+        - Ensure proper formatting and structure
+
+    - path: "helper-app/**/*.swift"
+      instructions: |
+        - Review Swift code for memory management
+        - Check for proper error handling
+        - Verify macOS API usage is correct
+
+  # Finishing touches
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: true
+
+  # Pre-merge checks
+  pre_merge_checks:
+    docstrings:
+      mode: warning
+      threshold: 70
+
+    title:
+      mode: warning
+      requirements: "Title should clearly describe the change and follow conventional commit format (e.g., 'feat:', 'fix:', 'docs:', etc.)"
+
+    description:
+      mode: warning
+
+    issue_assessment:
+      mode: warning
+
+    custom_checks:
+      - mode: error
+        name: "Critical Security Review"
+        instructions: |
+          MUST CHECK - Block merge if any of these issues are found:
+          - Command injection vulnerabilities (especially in child_process.exec/spawn)
+          - SQL injection or code injection vulnerabilities
+          - Path traversal vulnerabilities (../../ type attacks)
+          - Hardcoded secrets, API keys, or credentials
+          - Sensitive data in logs or error messages
+          - Missing authentication or authorization checks
+          - Use of dangerous functions without proper sanitization (eval, exec, etc.)
+          - Insecure deserialization
+          - Missing rate limiting on external API calls
+          - Improper error handling exposing system information
+
+      - mode: warning
+        name: "Security Best Practices"
+        instructions: |
+          Review for security best practices:
+          - Input validation is comprehensive and follows allow-list approach
+          - All user inputs are sanitized before use
+          - URL parameters are properly encoded/escaped
+          - Error messages are user-friendly but don't reveal implementation details
+          - Access tokens and sensitive data are handled securely
+          - File operations use safe, validated paths
+          - Dependencies are up-to-date and from trusted sources
+          - Principle of least privilege is followed
+          - Security headers or protections are in place where applicable
+
+      - mode: warning
+        name: "MCP Protocol Compliance"
+        instructions: |
+          Verify that:
+          - Tool definitions follow MCP schema requirements
+          - Tool inputs are properly validated before processing
+          - Tool responses match expected formats
+          - Error handling follows MCP error patterns
+          - Resource access is properly controlled
+
+  # Tools configuration
+  tools:
+    # SECURITY TOOLS - Highest priority
+    # Secret scanning - prevents credential leaks
+    gitleaks:
+      enabled: true
+
+    # Security vulnerability scanner
+    semgrep:
+      enabled: true
+
+    # Infrastructure security (Dockerfile, K8s, Terraform)
+    checkov:
+      enabled: true
+
+    # CODE QUALITY TOOLS
+    # TypeScript/JavaScript linting
+    eslint:
+      enabled: true
+
+    # Shell script security and linting
+    shellcheck:
+      enabled: true
+
+    # YAML security and linting
+    yamllint:
+      enabled: true
+
+    # GitHub Actions security
+    actionlint:
+      enabled: true
+
+    # DOCUMENTATION TOOLS
+    # Markdown linting
+    markdownlint:
+      enabled: true
+
+    # Language/grammar checking for docs
+    languagetool:
+      enabled: true
+      level: default
+      enabled_only: false
+
+    # Additional security scanning
+    github-checks:
+      enabled: true
+      timeout_ms: 90000
+
+# Chat Configuration
+chat:
+  auto_reply: true
+  art: true
+
+# Knowledge Base Configuration
+knowledge_base:
+  opt_out: false
+
+  web_search:
+    enabled: true
+
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/.cursorrules"
+      - "**/CONTRIBUTING.md"
+      - "**/CODING_STANDARDS.md"
+
+  learnings:
+    scope: auto
+
+  issues:
+    scope: auto
+
+  pull_requests:
+    scope: auto
+
+# Code Generation Configuration
+code_generation:
+  docstrings:
+    language: en-US
+    path_instructions:
+      - path: "src/**/*.ts"
+        instructions: |
+          - Use JSDoc style comments
+          - Include parameter types and return types
+          - Add @example tags for complex functions
+          - Document any MCP-specific behavior
+
+  unit_tests:
+    path_instructions:
+      - path: "src/**/*.ts"
+        instructions: |
+          - Use Jest testing framework
+          - Follow existing test patterns in the project
+          - Mock external dependencies (MCP SDK, child_process)
+          - Test both success and error cases
+          - Ensure proper async/await handling
