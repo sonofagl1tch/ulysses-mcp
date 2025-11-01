@@ -128,3 +128,4 @@ helper-app/**/*.d
 helper-app/**/*.dia
 helper-app/**/DerivedData/
 helper-app/**/*.xcarchive
+.continue/mcpServers/new-mcp-server.yaml
