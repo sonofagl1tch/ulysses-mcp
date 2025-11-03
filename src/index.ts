@@ -23,11 +23,17 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import { getAuditLogger } from "./audit-logger.js";
+import { getSecureTempManager } from "./secure-temp.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const execFileAsync = promisify(execFile);
+
+// Initialize security modules
+const auditLogger = getAuditLogger();
+const secureTempManager = getSecureTempManager();
 
 // Callback state for file-based IPC
 interface CallbackState {
