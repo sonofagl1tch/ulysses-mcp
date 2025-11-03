@@ -47,7 +47,6 @@ const pendingCallbacks = new Map<string, CallbackState>();
 const CALLBACK_TIMEOUT_MS = 30000; // 30 seconds
 const POLL_INTERVAL_MS = 100; // Check for callback file every 100ms
 const HELPER_APP_PATH = path.join(__dirname, "..", "helper-app", "UlyssesMCPHelper.app");
-const HELPER_PID_FILE = "/tmp/ulysses-mcp-helper.pid";
 
 // Actions that require callbacks to receive data
 const CALLBACK_ACTIONS = new Set([
@@ -195,9 +194,11 @@ function checkRateLimit(action: string): void {
  */
 async function ensureHelperAppRunning(): Promise<void> {
   try {
+    const helperPidPath = secureTempManager.getHelperPidPath();
+    
     // Check if helper app is already running
-    if (fs.existsSync(HELPER_PID_FILE)) {
-      const pid = parseInt(fs.readFileSync(HELPER_PID_FILE, 'utf8').trim());
+    if (fs.existsSync(helperPidPath)) {
+      const pid = parseInt(fs.readFileSync(helperPidPath, 'utf8').trim());
       try {
         // Check if process is still running
         process.kill(pid, 0);
@@ -205,7 +206,7 @@ async function ensureHelperAppRunning(): Promise<void> {
         return;
       } catch (e) {
         // Process not running, clean up stale PID file
-        fs.unlinkSync(HELPER_PID_FILE);
+        secureTempManager.deleteSecure(helperPidPath);
       }
     }
     
@@ -235,8 +236,8 @@ async function ensureHelperAppRunning(): Promise<void> {
     // Wait for helper app to start and create PID file
     let attempts = 0;
     while (attempts < 50) { // 5 seconds max
-      if (fs.existsSync(HELPER_PID_FILE)) {
-        const pid = parseInt(fs.readFileSync(HELPER_PID_FILE, 'utf8').trim());
+      if (fs.existsSync(helperPidPath)) {
+        const pid = parseInt(fs.readFileSync(helperPidPath, 'utf8').trim());
         console.error(`Helper app started with PID ${pid}`);
         return;
       }
@@ -258,7 +259,7 @@ async function ensureHelperAppRunning(): Promise<void> {
  */
 async function waitForCallback(callbackId: string): Promise<any> {
   return new Promise<any>((resolve, reject) => {
-    const callbackFilePath = `/tmp/ulysses-mcp-callback-${callbackId}.json`;
+    const callbackFilePath = secureTempManager.getCallbackPath(callbackId);
     
     const timeout = setTimeout(() => {
       const callback = pendingCallbacks.get(callbackId);
@@ -268,9 +269,7 @@ async function waitForCallback(callbackId: string): Promise<any> {
       }
       // Clean up callback file if it exists
       try {
-        if (fs.existsSync(callbackFilePath)) {
-          fs.unlinkSync(callbackFilePath);
-        }
+        secureTempManager.deleteSecure(callbackFilePath);
       } catch (e) {
         // Ignore cleanup errors
       }
@@ -283,9 +282,9 @@ async function waitForCallback(callbackId: string): Promise<any> {
     // Poll for callback file
     const pollInterval = setInterval(() => {
       try {
-        if (fs.existsSync(callbackFilePath)) {
+        if (secureTempManager.callbackFileExists(callbackId)) {
           // Read and parse callback data
-          const data = fs.readFileSync(callbackFilePath, 'utf8');
+          const data = secureTempManager.readSecure(callbackFilePath);
           const response = JSON.parse(data);
           
           // Clean up
@@ -295,7 +294,7 @@ async function waitForCallback(callbackId: string): Promise<any> {
           
           // Delete callback file
           try {
-            fs.unlinkSync(callbackFilePath);
+            secureTempManager.deleteSecure(callbackFilePath);
           } catch (e) {
             console.error(`Warning: Could not delete callback file: ${e}`);
           }

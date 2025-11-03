@@ -78,8 +78,14 @@ class UlyssesMCPHelper: NSObject, NSApplicationDelegate {
             return
         }
         
-        // Write to socket file for the MCP server to read
-        let socketDataPath = "/tmp/ulysses-mcp-callback-\(callbackId).json"
+        // Write to secure temp directory for the MCP server to read
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
+        let secureTempDir = "\(homeDir)/Library/Application Support/ulysses-mcp/tmp"
+        
+        // Create directory if it doesn't exist
+        try? FileManager.default.createDirectory(atPath: secureTempDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        
+        let socketDataPath = "\(secureTempDir)/callback-\(callbackId).json"
         do {
             try jsonString.write(toFile: socketDataPath, atomically: true, encoding: .utf8)
             print("Wrote callback data to: \(socketDataPath)")
@@ -102,7 +108,13 @@ app.delegate = helper
 app.setActivationPolicy(.accessory)
 
 // Write PID file so MCP server can manage the helper process
-let pidPath = "/tmp/ulysses-mcp-helper.pid"
+let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
+let secureTempDir = "\(homeDir)/Library/Application Support/ulysses-mcp/tmp"
+
+// Create directory if it doesn't exist
+try? FileManager.default.createDirectory(atPath: secureTempDir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+
+let pidPath = "\(secureTempDir)/helper.pid"
 try? "\(getpid())".write(toFile: pidPath, atomically: true, encoding: .utf8)
 
 print("Helper PID: \(getpid())")
