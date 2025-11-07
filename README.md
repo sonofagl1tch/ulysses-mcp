@@ -5,6 +5,10 @@
 
 An MCP (Model Context Protocol) server that enables AI assistants to interact with the [Ulysses](https://ulysses.app) writing application on macOS.
 
+## Blog
+
+[Building Ulysses Mcp From Frustration To A Smarter Writing Workflow](https://pebcak-consulting-llc.github.io/pebcak-consulting-llc/2025/10/30/building-ulysses-mcp-from-frustration-to-a-smarter-writing-workflow.html)
+
 ## Overview
 
 This MCP server provides comprehensive tools to automate Ulysses via its x-callback-url API, allowing AI assistants like Claude, Cline, and other MCP-compatible clients to:
