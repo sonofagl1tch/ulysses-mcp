@@ -37,7 +37,7 @@
   "author": "Ryan Nolette",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.1"
+    "@modelcontextprotocol/sdk": "^1.25.2"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
